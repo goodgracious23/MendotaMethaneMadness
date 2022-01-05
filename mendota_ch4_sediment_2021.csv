@@ -1,4 +1,4 @@
-site,doy,depth,vial_mass,ch4_sedvol,bulkdensity_sedvol,wet_mass,dry_mass,transfertin_mass,rewet_dry_mass,ashed_mass
+site,doy,sedDepth,vial_mass,ch4_sedvol,bulkdensity_sedvol,wet_mass,dry_mass,transfertin_mass,rewet_dry_mass,ashed_mass
 S0,146,1,0.2584,3,3,N/A,1.0963,0.932,1.7867,1.6299
 S0,146,5,0.2678,3,3,N/A,0.8921,0.9326,1.5722,1.4284
 S0,146,10,0.2607,3,3,N/A,1.1516,0.9354,1.84,1.676
