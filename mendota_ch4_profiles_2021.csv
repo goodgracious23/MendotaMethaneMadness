@@ -1,4 +1,4 @@
-site,DOY,time,depth,temp,DO_mgL,DO_sat,SpCond
+site,doy,time,depth,temp,DO_mgL,DO_sat,SpCond
 PB0,152,,0,17,7,71.7,0.1
 PB0,152,,0.25,16.5,6.7,69.5,922
 PB0,152,,0.5,16.3,5.85,59.1,927

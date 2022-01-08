@@ -14,14 +14,17 @@ inlet = rgb(149,209,204, max = 255, alpha = 200)
 #Read in and Clean pigment data
 pigments = read.csv("mendota_ch4_pigments_2021.csv")
 pig = pigments %>%
+  #Remove the sites that we only sampled once
   filter(!(site == "Y3" | site == "G3" | site == "PB3")) %>%
   group_by(doy, site, group) %>%
   summarize(chl = mean(Chl, na.rm = TRUE),
             pc = mean(PC, na.rm = TRUE)) %>%
   ungroup()
 
+#Order the sites in a way that makes sense for comparison
 pig$site <- factor(pig$site, levels = c("CFL1", "CFL2", "G1", "G2", "PB0", "PB1", "PB2","S0", "Y0", "Y1", "Y2"))
 
+#=================================================
 #Ridgeline Plots of Pigments - TIME SERIES
 windows(height = 9, width = 6.5)
 ggplot(pig, aes(doy, site, height = chl, fill = site, group = site)) + 
