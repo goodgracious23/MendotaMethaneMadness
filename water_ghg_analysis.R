@@ -1,6 +1,8 @@
 #Water CH4 Analysis - Mendota Methane Madness
 if (!require(tidyverse)) install.packages('tidyverse')
 library(tidyverse)
+if (!require(ggridges)) install.packages('ggridges')
+library(ggridges)
 
 #======================
 ### Constants, Equations, and Functions ----
@@ -46,7 +48,6 @@ water = ghg %>%
   group_by(site, doy, waterDepth) %>%
   #calculate mean ppm from duplicate samples
   summarize(ch4 = mean(CH4_FID, na.rm = TRUE),
-            co2 = mean(CO2_TCD, na.rm = TRUE),
             n2o = mean(N2O_ECD, na.rm = TRUE)) %>%
   ungroup()
 #Subset out only the surface water values
@@ -61,14 +62,12 @@ atmo = ghg %>%
          -date, -site, -time, -sedDepth, -waterDepth, -rep) %>%
   group_by(doy) %>%
   summarize(atmo_ch4_GC = mean(CH4_FID, na.rm = TRUE),
-            atmo_co2_GC = mean(CO2_TCD, na.rm = TRUE),
             atmo_n2o_GC = mean(N2O_ECD, na.rm = TRUE)) %>%
   ungroup()
 
 #Subset the ysi profiles to surface values only
 surface_ysi = profiles %>%
-  filter(depth == 0) %>%
-  select(-time)
+  filter(depth == 0)
 
 water_ghg1 = left_join(surface_ghg, surface_ysi, by = c("site", "doy"))
 water_ghg = left_join(water_ghg1, atmo, by = c("doy"))
@@ -85,10 +84,6 @@ syr_conc = water_ghg %>%
   # temperature-corrected Henry's Law constants (KH) based on pond surface water temperatures
   mutate(tKH_ch4 = 
            KH_ch4 * exp(KH_td_ch4 * ((1 / (temp + 273.15)) - (1 / 298.15))),
-         
-         tKH_co2 = 
-           KH_co2 * exp(KH_td_co2 * ((1 / (temp + 273.15)) - (1 / 298.15))),
-         
          tKH_n2o = 
            KH_n2o * exp(KH_td_n2o * ((1 / (temp + 273.15)) - (1 / 298.15)))) %>%
   # concentration of gases in equilibrated headspace (units = uM)
@@ -107,36 +102,29 @@ syr_conc = water_ghg %>%
 #  to correct for gas present in headspace prior to equilibration
 atm_conc = water_ghg %>%
   mutate(pch4_atmo = atmo_ch4_GC / 10^6 * 0.99,
-         pco2_atmo = atmo_co2_GC / 10^6 * 0.99,
          pn2o_atmo = atmo_n2o_GC / 10^6 * 0.99) %>%
   # Ideal Gas Law (units = uM)
   mutate(ch4_atmo = ideal_gas_law(pch4_atmo, 25),
-         co2_atmo = ideal_gas_law(pco2_atmo, 25),
          n2o_atmo = ideal_gas_law(pn2o_atmo, 25))
 
 #==============================
 #Calculate the concentration of dissolved gas in the sample
+
 lake_conc = syr_conc %>%
   # add atmosphere concentrations to syringe concentrations
-  left_join(atm_conc %>% select(doy, ends_with("atmo"))) %>%
-  # add original lake water partial pressure from above 
-  left_join(lake_co2) %>%
+  left_join(atm_conc %>% select(doy, site, ch4_atmo, n2o_atmo), 
+            by = c("doy", "site")) %>%
   # original gas concentration dissolved in lake water (units = uM)
-  mutate(ch4_lake = (ch4_tot_umol - (ch4_atmo * vol_air)) / vol_water,
-         n2o_lake = (n2o_tot_umol - (n2o_atmo * vol_air)) / vol_water,
-         co2_lake = tKH_co2 * pco2_aq * 10^6) %>%
-  # drop unnecessary variables from calculations
-  select(sample_id:doy, surface_temp, ends_with("lake"), ends_with("atmo"), starts_with("tKH"))
-
-
-
-
-
-
+  mutate(ch4_lake = (ch4_tot_umol - (ch4_atmo * 0.03)) / 0.03,
+         n2o_lake = (n2o_tot_umol - (n2o_atmo * 0.03)) / 0.03)
 
 
 #=============================================================
+#=============================================================
+# Let's do some science now
 
+mendota_ghg = lake_conc %>%
+  select(!(atmo_ch4_GC:n2o_atmo)) %>%
   #Make the site names something another human being would understand
   mutate(site = replace(site, site=="S0", "Sixmile Inlet"),
          site = replace(site, site=="Y0", "Yahara Inlet"),
@@ -144,35 +132,24 @@ lake_conc = syr_conc %>%
          site = replace(site, site=="Y2", "Yahara Estuary\nOffshore"),
          site = replace(site, site=="G1", "Yahara Estuary\nNearshore REF"),
          site = replace(site, site=="G2", "Yahara Estuary\nOffshore REF"),
-         site = replace(site, site=="PB0", "PB Inlet"),
-         site = replace(site, site=="PB1", "PB Estuary\nNearshore"),
-         site = replace(site, site=="PB2", "PB Estuary\nOffshore"),
-         site = replace(site, site=="CFL1", "PB Estuary\nNearshore REF"),
-         site = replace(site, site=="CFL2", "PB Estuary\nOffshore REF"))
-
+         site = replace(site, site=="PB0", "Pheasant Branch\nInlet"),
+         site = replace(site, site=="PB1", "Pheasant Branch\nEstuary Nearshore"),
+         site = replace(site, site=="PB2", "Pheasant Branch\nEstuary Offshore"),
+         site = replace(site, site=="CFL1", "Pheasant Branch Estuary\nNearshore REF"),
+         site = replace(site, site=="CFL2", "Pheasant Branch Estuary\nOffshore REF"))
 #Order the sites in a way that makes sense for comparison
-water$site <- factor(water$site, 
-                     levels = c("PB Estuary\nOffshore REF",
-                                "PB Estuary\nOffshore",
-                                "PB Estuary\nNearshore REF",
-                                "PB Estuary\nNearshore",
-                                "PB Inlet",
+mendota_ghg$site <- factor(mendota_ghg$site, 
+                     levels = c("Pheasant Branch Estuary\nOffshore REF",
+                                "Pheasant Branch\nEstuary Offshore",
+                                "Pheasant Branch Estuary\nNearshore REF",
+                                "Pheasant Branch\nEstuary Nearshore",
+                                "Pheasant Branch\nInlet",
                                 "Yahara Estuary\nOffshore REF",
                                 "Yahara Estuary\nOffshore",
                                 "Yahara Estuary\nNearshore REF",
                                 "Yahara Estuary\nNearshore",
                                 "Yahara Inlet",
                                 "Sixmile Inlet"))
-
-#Subset just the surface water data
-surface = water %>%
-  filter(waterDepth == "Surface") 
-surface = as.data.frame(surface)
-
-#Subset just the bottom water data
-bottom = water %>%
-  filter(waterDepth == "Bottom")
-bottom = as.data.frame(bottom)
 
 #Color palette for visualization
 offshore = rgb(34,87,126, max = 255, alpha = 200)
@@ -182,7 +159,7 @@ inlet = rgb(149,209,204, max = 255, alpha = 200)
 #======================================================
 # Surface Methane
 windows(height = 9, width = 6.5)
-ggplot(surface, aes(x = ch4, y = site, fill = site)) + 
+ggplot(mendota_ghg, aes(x = ch4_lake, y = site, fill = site)) + 
   geom_density_ridges2(scale = 2, 
                        linetype = 0, 
                        panel_scaling = TRUE) +
@@ -194,23 +171,6 @@ ggplot(surface, aes(x = ch4, y = site, fill = site)) +
   scale_y_discrete(expand = c(0, 0)) +
   scale_x_continuous(expand = c(0, 0)) +
   labs(title = 'Surface Water Methane') +
-  xlab(label = 'Methane Concentration (ppm)') +
+  xlab(label = 'Methane Concentration (uM)') +
   ylab(label = '')
 
-#======================================================
-# Surface Carbon Dioxide
-windows(height = 9, width = 6.5)
-ggplot(surface, aes(x = co2, y = site, fill = site)) + 
-  geom_density_ridges2(scale = 2, 
-                       linetype = 0, 
-                       panel_scaling = TRUE) +
-  scale_fill_cyclical(values = c(offshore, offshore, 
-                                 nearshore, nearshore, inlet, 
-                                 offshore, offshore, 
-                                 nearshore, nearshore, inlet, inlet)) +
-  theme_ridges() +
-  scale_y_discrete(expand = c(0, 0)) +
-  scale_x_continuous(expand = c(0, 0)) +
-  labs(title = 'Surface Water CO2') +
-  xlab(label = 'CO2Concentration (ppm)') +
-  ylab(label = '')
