@@ -99,7 +99,7 @@ ss$iss = ((ss$ashed_mass - ss$filter_mass) / (ss$volume_filtered/1000))*1000
 
 ss$site <- factor(ss$site, levels = c("CFL2", "CFL1", "PB2", "PB1", "PB0",
                                       "G1", "G2","Y0", "S0", "Y2", "Y1"))
-
+# write.csv(ss, file = "SuspendedSolids_Mendota.csv")
 #Ridgeline Plots of Total Suspended Solids
 windows(height = 9, width = 6.5)
 ggplot(ss, aes(doy, site, height = tss, fill = site, group = site)) + 
